@@ -40,21 +40,6 @@ class Blacklist(Base):
     blacklisted_user_id = sq.Column(sq.Integer, sq.ForeignKey('users.id'))
 
 
-def get_top_three_photos_for_all_users(session):
-    top_photos_query = text("""
-    WITH RankedPhotos AS (
-        SELECT *,
-               RANK() OVER (PARTITION BY user_id ORDER BY likes DESC) as rank
-        FROM photos
-    )
-    SELECT user_id, id, url, likes
-    FROM RankedPhotos
-    WHERE rank <= 3;
-    """)
-    result = session.execute(top_photos_query)
-    return result.fetchall()
-
-
 def create_session():
     DSN = os.getenv('DATABASE_URL')
     engine = create_engine(DSN)
@@ -68,10 +53,31 @@ def create_tables(engine):
     Base.metadata.create_all(engine)
 
 
+def add_to_favorites(session, user_id, favorite_user_id):
+    """Добавление пользователя в избранное."""
+    favorite = Favorite(user_id=user_id, favorite_user_id=favorite_user_id)
+    session.add(favorite)
+    session.commit()
+
+
+def add_to_blacklist(session, user_id, blacklisted_user_id):
+    """Добавление пользователя в черный список."""
+    blacklist = Blacklist(user_id=user_id, blacklisted_user_id=blacklisted_user_id)
+    session.add(blacklist)
+    session.commit()
+
+
+def add_photos(session, user_id, photo_urls):
+    """Добавление фотографий пользователя."""
+    for url in photo_urls:
+        photo = Photo(user_id=user_id, url=url)
+        session.add(photo)
+    session.commit()
+
+
 if __name__ == "__main__":
     DSN = os.getenv('DATABASE_URL')
     engine = create_engine(DSN)
     create_tables(engine)
     session = create_session()
-    top_photos_for_all_users = get_top_three_photos_for_all_users(session)
     session.close()
